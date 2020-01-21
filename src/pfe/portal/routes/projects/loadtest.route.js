@@ -10,6 +10,7 @@
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
 const express = require('express');
+const fs = require('fs')
 const path = require('path');
 const queryString = require('query-string');
 
@@ -164,6 +165,33 @@ router.post('/api/v1/projects/:id/loadtest/config', validateReq, async function 
     }
     await project.writeNewLoadTestConfigFile(configOptions);
     res.status(200).json(`load-test/config.json successfully written to project ${project.name}`);
+  } catch (err) {
+    log.error(err.info || err);
+    res.status(500).send(err.info || err);
+  }
+});
+
+/**
+ * Function to read the load-test/config.json for a project
+ * @param id, the id of the project
+ * @return 200 if project existed and the load-test/config.json file is found
+ * @return 400 if input is invalid
+ * @return 404 if project is not found
+ * @return 500 on internal error
+ */
+
+router.get('/api/v1/projects/:id/profiling/:testRunTime', validateReq, async function (req, res) {
+  try {
+    const user = req.cw_user;
+    const projectID = req.sanitizeParams('id');
+    const project = user.projectList.retrieveProject(projectID);
+    if (!project) {
+      res.status(404).send(`Unable to find project ${projectID}`);
+      return;
+    }
+    const testRunTime = req.sanitizeParams('testRunTime');
+    const newProfiling = await project.getProfilingByTime(testRunTime);
+    res.status(200).send(newProfiling);
   } catch (err) {
     log.error(err.info || err);
     res.status(500).send(err.info || err);

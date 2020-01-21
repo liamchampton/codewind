@@ -11,6 +11,7 @@
 
 const cwUtils = require('./utils/sharedFunctions.js');
 const dateFormat = require('dateformat');
+const exec = require('child_process').exec
 const fs = require('fs-extra');
 const io = require('socket.io-client');
 const { promisify } = require('util');
@@ -443,7 +444,7 @@ module.exports = class LoadRunner {
       if (this.collectionUri !== null) {
         this.recordCollection();
       }
-      this.endProfiling();
+      this.endProfiling(this.project.containerId, this.project.javaLoadTestDir, this.project.language, this.project.name);
       this.user.uiSocket.emit('runloadStatusChanged', { projectID: this.project.projectID,  status: 'completed' });
       this.project = null;
     });

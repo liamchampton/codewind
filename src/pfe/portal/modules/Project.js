@@ -10,7 +10,9 @@
  *******************************************************************************/
 
 const fs = require('fs-extra');
+const exec = require('child_process').exec
 const { join } = require('path');
+const path = require('path');
 const uuidv1 = require('uuid/v1');
 const Client = require('kubernetes-client').Client
 const config = require('kubernetes-client').config;
@@ -352,6 +354,20 @@ module.exports = class Project {
   /**
    * @param {String|Int} timeOfTestRun in 'yyyymmddHHMMss' format
    */
+  async getProfilingByTime(timeOfTestRun) {
+    const pathToProfilingFile = await this.getPathToProfilingFile(timeOfTestRun);
+    let profiling
+    if (this.language == 'nodejs') {
+      profiling = await fs.readJson(pathToProfilingFile);
+    } else if (this.language == 'java') {
+      profiling = pathToProfilingFile
+    }
+    return profiling;
+  }
+
+  /**
+   * @param {String|Int} timeOfTestRun in 'yyyymmddHHMMss' format
+   */
   async deleteMetrics(timeOfTestRun) {
     let pathToLoadTestDir = null;
     try {
@@ -412,6 +428,42 @@ module.exports = class Project {
     }
     const pathToMetricsJson = join(pathToLoadTestDir, 'metrics.json');
     return pathToMetricsJson;
+  }
+
+  /**
+   * @param {String|Int} timeOfTestRun in 'yyyymmddHHMMss' format
+   */
+  async getPathToProfilingFile(timeOfTestRun) {
+    let pathToLoadTestDir;
+    try {
+      pathToLoadTestDir = await this.getPathToLoadTestDir(timeOfTestRun);
+    } catch (err) {
+      pathToLoadTestDir = await this.getClosestPathToLoadTestDir(timeOfTestRun);
+    }
+    if (this.language == 'nodejs') {
+      const pathToProfilingJson = join(pathToLoadTestDir, 'profiling.json');
+      return pathToProfilingJson;
+    } else if (this.language == 'java') {
+      await exec(`docker cp ${this.containerId}:${path.join('/', 'home', 'default', 'app', 'load-test', timeOfTestRun)} ../codewind-workspace/${this.name}/load-test/`, (error, stdout, stderr) => {
+        console.log(stdout)
+        console.log(stderr)
+        console.log(error)
+      })
+      const files = await fs.readdir(pathToLoadTestDir);
+      console.log(pathToLoadTestDir)
+      console.log(files)
+      let file;
+      for (let i = 0; i < files.length; i++) {
+        if (path.extname(files[i]) == '.hcd') {
+          file = files[i];
+          break;
+        }
+      }
+      console.log(file)
+      const pathToProfilingHdc = join(pathToLoadTestDir, file);
+      return pathToProfilingHdc;
+    }
+    return null
   }
 
   /**
